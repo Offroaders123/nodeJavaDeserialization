@@ -29,35 +29,63 @@ const SC_ENUM = 0x10;
 
 const tmpBuf = Buffer.alloc(8);
 
+/**
+ * @param {string} str
+ * @returns {string}
+ */
 function utf8(str) {
     return Buffer.from(str, "utf8").toString("hex");
 }
 
+/**
+ * @param {number} i
+ * @returns {string}
+ */
 function uint8(i) {
     tmpBuf.writeUInt8(i, 0);
     return tmpBuf.toString("hex", 0, 1);
 }
 
+/**
+ * @param {number} i
+ * @returns {string}
+ */
 function uint16(i) {
     tmpBuf.writeUInt16BE(i, 0);
     return tmpBuf.toString("hex", 0, 2);
 }
 
+/**
+ * @param {number} i
+ * @returns {string}
+ */
 function uint32(i) {
     tmpBuf.writeUInt32BE(i, 0);
     return tmpBuf.toString("hex", 0, 4);
 }
 
+/**
+ * @param {number} i
+ * @returns {string}
+ */
 function int32(i) {
     tmpBuf.writeInt32BE(i, 0);
     return tmpBuf.toString("hex", 0, 4);
 }
 
+/**
+ * @param {string} str
+ * @returns {string}
+ */
 function str(str) {
     const chars = utf8(str);
     return uint16(chars.length >>> 1) + chars;
 }
 
+/**
+ * @param {string} hex
+ * @returns {unknown}
+ */
 function parsing(hex) {
     const buf = Buffer.from(hex, "hex");
     return function() {
@@ -65,6 +93,10 @@ function parsing(hex) {
     };
 }
 
+/**
+ * @param {{ flags?: number; fieldType?: string; classDesc?: string; }} overrides
+ * @returns {string}
+ */
 function template1(overrides) {
     const flags = overrides.flags !== undefined
           ? overrides.flags : SC_SERIALIZABLE;

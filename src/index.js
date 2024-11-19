@@ -25,6 +25,9 @@
 var Parser = require("./parser.js");
 require("./util.js");
 
+/**
+ * @param {Buffer} buf
+ */
 module.exports.parse = function parse(buf) {
     var parser = new Parser(buf);
     return parser.contents;

@@ -27,6 +27,26 @@
 var assert = require("assert");
 var Long = require("long");
 
+/**
+ * @typedef {string | ClassDesc | ObjectDesc} Handle
+ */
+
+/**
+ * @typedef {{ name: string; serialVersionUID: string; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; }} ClassDesc
+ */
+
+/**
+ * @typedef {{ class: string; extends: object; }} ObjectDesc
+ */
+
+/**
+ * @typedef {[] & { class: string; extends: object; }} ArrayDesc
+ */
+
+/**
+ * @typedef {{ type: string; name: string; className: string; }} FieldDesc
+ */
+
 var names = [
     "Null", "Reference", "ClassDesc", "Object", "String", "Array", "Class", "BlockData", "EndBlockData",
     "Reset", "BlockDataLong", "Exception", "LongString", "ProxyClassDesc", "Enum"
@@ -34,23 +54,38 @@ var names = [
 
 var endBlock = {};
 
+/**
+ * @param {Buffer} buf
+ */
 function Parser(buf) {
+    /** @type {Buffer} */
     this.buf = buf;
     this.pos = 0;
     this.nextHandle = 0x7e0000;
+    /**
+     * @type {(Handle | null)[]}
+     */
     this.handles = [];
+    /** @type {[]} */
     this.contents = [];
+    // @ts-expect-error
     this.magic();
+    // @ts-expect-error
     this.version();
     while (this.pos < this.buf.length) {
         this.contents.push(this.content());
     }
 }
 
+/**
+ * @param {number} len
+ * @returns {number}
+ */
 Parser.prototype.step = function(len) {
     var pos = this.pos;
     this.pos += len;
     if (this.pos > this.buf.length) {
+        /** @type {any} */
         var err = new Error("Premature end of input");
         err.buf = this.buf;
         err.pos = this.pos;
@@ -59,78 +94,130 @@ Parser.prototype.step = function(len) {
     return pos;
 }
 
+/**
+ * @param {number} len
+ * @param {BufferEncoding} encoding
+ * @returns {string}
+ */
 Parser.prototype.chunk = function(len, encoding) {
     var pos = this.step(len);
     return this.buf.toString(encoding, pos, this.pos);
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.readUInt8 = function() {
     return this.buf.readUInt8(this.step(1));
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.readInt8 = function() {
     return this.buf.readInt8(this.step(1));
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.readUInt16 = function() {
     return this.buf.readUInt16BE(this.step(2));
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.readInt16 = function() {
     return this.buf.readInt16BE(this.step(2));
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.readUInt32 = function() {
     return this.buf.readUInt32BE(this.step(4));
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.readInt32 = function() {
     return this.buf.readInt32BE(this.step(4));
 }
 
+/**
+ * @param {number} len
+ * @returns {string}
+ */
 Parser.prototype.readHex = function(len) {
     return this.chunk(len, "hex");
 }
 
+/**
+ * @returns {string}
+ */
 Parser.prototype.utf = function() {
     return this.chunk(this.readUInt16(), "utf8");
 }
 
+/**
+ * @returns {string}
+ */
 Parser.prototype.utfLong = function() {
     if (this.readUInt32() !== 0)
         throw new Error("Can't handle more than 2^32 bytes in a string");
     return this.chunk(this.readUInt32(), "utf8");
 }
 
+/**
+ * @type {number | (() => void)}
+ */
 Parser.prototype.magic = function() {
     this.magic = this.readUInt16();
     if (this.magic !== 0xaced)
         throw Error("STREAM_MAGIC not found");
 }
 
+/**
+ * @type {number | (() => void)}
+ */
 Parser.prototype.version = function() {
     this.version = this.readUInt16();
     if (this.version !== 5)
         throw Error("Only understand protocol version 5");
 }
 
+/**
+ * @param {string[]} [allowed]
+ * @returns {unknown}
+ */
 Parser.prototype.content = function(allowed) {
     var tc = this.readUInt8() - 0x70;
     if (tc < 0 || tc > names.length)
         throw Error("Don't know about type 0x" + (tc + 0x70).toString(16));
-    var name = names[tc];
+    /** @type {string} */
+    var name = /** @type {string} */ (names[tc]);
     if (allowed && allowed.indexOf(name) === -1)
         throw Error(name + " not allowed here");
+    // @ts-expect-error
     var handler = this["parse" + name];
     if (!handler)
         throw Error("Don't know how to handle " + name);
+    /** @type {unknown} */
     var elt = handler.call(this);
     return elt;
 }
 
+/**
+ * @param {string[]} [allowed]
+ * @returns {string[]}
+ */
 Parser.prototype.annotations = function(allowed) {
+    /** @type {string[]} */
     var annotations = [];
     while (true) {
+        /** @type {string} */
         var annotation = this.content(allowed);
         if (annotation === endBlock)
             break;
@@ -139,11 +226,18 @@ Parser.prototype.annotations = function(allowed) {
     return annotations;
 }
 
+/**
+ * @returns {ClassDesc}
+ */
 Parser.prototype.classDesc = function() {
     return this.content(["ClassDesc", "ProxyClassDesc", "Null", "Reference"]);
 }
 
+/**
+ * @returns {ClassDesc}
+ */
 Parser.prototype.parseClassDesc = function() {
+    /** @type {ClassDesc} */
     var res = {};
     res.name = this.utf();
     res.serialVersionUID = this.readHex(8);
@@ -159,7 +253,11 @@ Parser.prototype.parseClassDesc = function() {
     return res;
 }
 
+/**
+ * @returns {FieldDesc}
+ */
 Parser.prototype.fieldDesc = function() {
+    /** @type {FieldDesc} */
     var res = {};
     res.type = String.fromCharCode(this.readUInt8());
     res.name = this.utf();
@@ -168,11 +266,18 @@ Parser.prototype.fieldDesc = function() {
     return res;
 }
 
+/**
+ * @returns {ClassDesc}
+ */
 Parser.prototype.parseClass = function() {
     return this.newHandle(this.classDesc());
 }
 
+/**
+ * @returns {ObjectDesc}
+ */
 Parser.prototype.parseObject = function() {
+    /** @type {ObjectDesc} */
     var res = Object.defineProperties({}, {
         "class": {
             configurable: true,
@@ -188,6 +293,11 @@ Parser.prototype.parseObject = function() {
     return res;
 }
 
+/**
+ * @param cls
+ * @param obj
+ * @returns {void}
+ */
 Parser.prototype.recursiveClassData = function(cls, obj) {
     if (cls.super)
         this.recursiveClassData(cls.super, obj);
@@ -196,6 +306,9 @@ Parser.prototype.recursiveClassData = function(cls, obj) {
         obj[name] = fields[name];
 }
 
+/**
+ * @param cls
+ */
 Parser.prototype.classdata = function(cls) {
     var res, data;
     var postproc = this[cls.name + "@" + cls.serialVersionUID];
@@ -217,9 +330,13 @@ Parser.prototype.classdata = function(cls) {
     }
 }
 
+/**
+ * @returns {ArrayDesc}
+ */
 Parser.prototype.parseArray = function() {
     var classDesc = this.classDesc();
-    var res = Object.defineProperties([], {
+    /** @type {ArrayDesc} */
+    var res = Object.defineProperties(/** @type {ArrayDesc} */ ([]), {
         "class": {
             configurable: true,
             value: classDesc
@@ -256,6 +373,9 @@ Parser.prototype.parseEnum = function() {
     return res;
 }
 
+/**
+ * @returns {Buffer}
+ */
 Parser.prototype.parseBlockData = function() {
     var len = this.readUInt8();
     var res = this.buf.slice(this.pos, this.pos + len);
@@ -263,6 +383,9 @@ Parser.prototype.parseBlockData = function() {
     return res;
 }
 
+/**
+ * @returns {Buffer}
+ */
 Parser.prototype.parseBlockDataLong = function() {
     var len = this.readUInt32();
     var res = this.buf.slice(this.pos, this.pos + len);
@@ -270,14 +393,23 @@ Parser.prototype.parseBlockDataLong = function() {
     return res;
 }
 
+/**
+ * @returns {string}
+ */
 Parser.prototype.parseString = function() {
     return this.newHandle(this.utf());
 }
 
+/**
+ * @returns {string}
+ */
 Parser.prototype.parseLongString = function() {
     return this.newHandle(this.utfLong());
 }
 
+/**
+ * @param type
+ */
 Parser.prototype.primHandler = function(type) {
     var handler = this["prim" + type];
     if (!handler)
@@ -285,6 +417,9 @@ Parser.prototype.primHandler = function(type) {
     return handler;
 }
 
+/**
+ * @param cls
+ */
 Parser.prototype.values = function(cls) {
     var vals = {};
     var fields = cls.fields;
@@ -296,74 +431,130 @@ Parser.prototype.values = function(cls) {
     return vals;
 }
 
+/**
+ * @template {Handle} T
+ * @param {T} obj
+ * @returns {T}
+ */
 Parser.prototype.newHandle = function(obj) {
     this.handles[this.nextHandle++] = obj;
     return obj;
 }
 
+/**
+ * @template {Handle} T
+ * @returns {(obj: T) => void}
+ */
 Parser.prototype.newDeferredHandle = function() {
     var idx = this.nextHandle++;
     var handles = this.handles;
     handles[idx] = null;
+    /**
+     * @param {T} obj
+     */
     return function(obj) {
         handles[idx] = obj;
     };
 }
 
+/**
+ * @returns {Handle | null | undefined}
+ */
 Parser.prototype.parseReference = function() {
     return this.handles[this.readInt32()];
 }
 
+/**
+ * @returns {null}
+ */
 Parser.prototype.parseNull = function() {
     return null;
 }
 
+/**
+ * @returns {{}}
+ */
 Parser.prototype.parseEndBlockData = function() {
     return endBlock;
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.primB = function() {
     return this.readInt8();
 }
 
+/**
+ * @returns {string}
+ */
 Parser.prototype.primC = function() {
     return String.fromCharCode(this.readUInt16());
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.primD = function() {
     return this.buf.readDoubleBE(this.step(8));
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.primF = function() {
     return this.buf.readFloatBE(this.step(4));
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.primI = function() {
     return this.readInt32();
 }
 
+/**
+ * @returns {Long}
+ */
 Parser.prototype.primJ = function() {
     var high = this.readUInt32();
     var low = this.readUInt32();
     return Long.fromBits(low, high);
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.primS = function() {
     return this.readInt16();
 }
 
+/**
+ * @returns {boolean}
+ */
 Parser.prototype.primZ = function() {
     return !!this.readInt8();
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype.primL = function() {
     return this.content();
 }
 
+/**
+ * @returns {number}
+ */
 Parser.prototype["prim["] = function() {
     return this.content();
 }
 
+/**
+ * @param {string} className
+ * @param {string} serialVersionUID
+ * @param parser
+ */
 Parser.register = function(className, serialVersionUID, parser) {
     assert.strictEqual(serialVersionUID.length, 16,
                        "serialVersionUID must be 16 hex digits");

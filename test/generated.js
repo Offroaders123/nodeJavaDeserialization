@@ -5,6 +5,13 @@ const expect = chai.expect;
 const zlib = require('zlib');
 const javaDeserialization = require('../');
 
+/**
+ * Could use more solidified typings for the `checks` parameter.
+ * 
+ * @param {string} b64data
+ * @param {(...args: any[]) => unknown} checks
+ * @returns {() => void}
+ */
 function testCase(b64data, checks) {
   return function() {
     let bytes = Buffer.from(b64data, 'base64');
