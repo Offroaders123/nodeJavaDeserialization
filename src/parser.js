@@ -32,15 +32,15 @@ var Long = require("long");
  */
 
 /**
- * @typedef {{ name: string; serialVersionUID: string; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; }} ClassDesc
+ * @typedef {{ name: names; serialVersionUID: string; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; }} ClassDesc
  */
 
 /**
- * @typedef {{ class: ClassDesc; extends: Record<string, ClassDesc>; }} ObjectDesc
+ * @typedef {{ class: ClassDesc; extends: Record<names, ClassDesc>; }} ObjectDesc
  */
 
 /**
- * @typedef {Handle[] & { class: ClassDesc; extends: Record<string, ClassDesc>; }} ArrayDesc
+ * @typedef {Handle[] & { class: ClassDesc; extends: Record<names, ClassDesc>; }} ArrayDesc
  */
 
 /**
@@ -51,10 +51,14 @@ var Long = require("long");
  * @typedef {(cls: ClassDesc, res: Record<string, Handle>, data: [Buffer, ...Buffer[]]) => Record<string, Handle>} ParseFunc
  */
 
-var names = [
+/**
+ * @typedef {typeof names[number]} names
+ */
+
+var names = /** @type {const} */ ([
     "Null", "Reference", "ClassDesc", "Object", "String", "Array", "Class", "BlockData", "EndBlockData",
     "Reset", "BlockDataLong", "Exception", "LongString", "ProxyClassDesc", "Enum"
-];
+]);
 
 var endBlock = {};
 
@@ -70,7 +74,7 @@ function Parser(buf) {
      * @type {(Handle | null)[]}
      */
     this.handles = [];
-    /** @type {[]} */
+    /** @type {Handle[]} */
     this.contents = [];
     // @ts-expect-error
     this.magic();
@@ -245,7 +249,7 @@ Parser.prototype.classDesc = function() {
 Parser.prototype.parseClassDesc = function() {
     /** @type {ClassDesc} */
     var res = {};
-    res.name = this.utf();
+    res.name = /** @type {names} */ (this.utf());
     res.serialVersionUID = this.readHex(8);
     this.newHandle(res);
     res.flags = this.readUInt8();

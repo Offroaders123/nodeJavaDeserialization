@@ -27,6 +27,7 @@ require("./util.js");
 
 /**
  * @param {Buffer} buf
+ * @returns {import("./parser.js").Handle[]}
  */
 module.exports.parse = function parse(buf) {
     var parser = new Parser(buf);
