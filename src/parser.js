@@ -67,10 +67,13 @@ var endBlock = {};
  */
 
 /**
- * @param {Buffer} buf
  * @implements {ParserMethods}
  */
-function Parser(buf) {
+class Parser {
+/**
+ * @param {Buffer} buf
+ */
+constructor(buf) {
     /** @type {Buffer} */
     this.buf = buf;
     this.pos = 0;
@@ -94,7 +97,7 @@ function Parser(buf) {
  * @param {number} len
  * @returns {number}
  */
-Parser.prototype.step = function(len) {
+step(len) {
     var pos = this.pos;
     this.pos += len;
     if (this.pos > this.buf.length) {
@@ -112,7 +115,7 @@ Parser.prototype.step = function(len) {
  * @param {BufferEncoding} encoding
  * @returns {string}
  */
-Parser.prototype.chunk = function(len, encoding) {
+chunk(len, encoding) {
     var pos = this.step(len);
     return this.buf.toString(encoding, pos, this.pos);
 }
@@ -120,42 +123,42 @@ Parser.prototype.chunk = function(len, encoding) {
 /**
  * @returns {number}
  */
-Parser.prototype.readUInt8 = function() {
+readUInt8() {
     return this.buf.readUInt8(this.step(1));
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.readInt8 = function() {
+readInt8() {
     return this.buf.readInt8(this.step(1));
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.readUInt16 = function() {
+readUInt16() {
     return this.buf.readUInt16BE(this.step(2));
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.readInt16 = function() {
+readInt16() {
     return this.buf.readInt16BE(this.step(2));
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.readUInt32 = function() {
+readUInt32() {
     return this.buf.readUInt32BE(this.step(4));
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.readInt32 = function() {
+readInt32() {
     return this.buf.readInt32BE(this.step(4));
 }
 
@@ -163,21 +166,21 @@ Parser.prototype.readInt32 = function() {
  * @param {number} len
  * @returns {string}
  */
-Parser.prototype.readHex = function(len) {
+readHex(len) {
     return this.chunk(len, "hex");
 }
 
 /**
  * @returns {string}
  */
-Parser.prototype.utf = function() {
+utf() {
     return this.chunk(this.readUInt16(), "utf8");
 }
 
 /**
  * @returns {string}
  */
-Parser.prototype.utfLong = function() {
+utfLong() {
     if (this.readUInt32() !== 0)
         throw new Error("Can't handle more than 2^32 bytes in a string");
     return this.chunk(this.readUInt32(), "utf8");
@@ -186,7 +189,7 @@ Parser.prototype.utfLong = function() {
 /**
  * @type {number | (() => void)}
  */
-Parser.prototype.magic = function() {
+magic = () => {
     this.magic = this.readUInt16();
     if (this.magic !== 0xaced)
         throw Error("STREAM_MAGIC not found");
@@ -195,7 +198,7 @@ Parser.prototype.magic = function() {
 /**
  * @type {number | (() => void)}
  */
-Parser.prototype.version = function() {
+version = () => {
     this.version = this.readUInt16();
     if (this.version !== 5)
         throw Error("Only understand protocol version 5");
@@ -206,7 +209,7 @@ Parser.prototype.version = function() {
  * @param {string[]} [allowed]
  * @returns {T}
  */
-Parser.prototype.content = function(allowed) {
+content(allowed) {
     var tc = this.readUInt8() - 0x70;
     if (tc < 0 || tc > names.length)
         throw Error("Don't know about type 0x" + (tc + 0x70).toString(16));
@@ -228,7 +231,7 @@ Parser.prototype.content = function(allowed) {
  * @param {string[]} [allowed]
  * @returns {string[]}
  */
-Parser.prototype.annotations = function(allowed) {
+annotations(allowed) {
     /** @type {string[]} */
     var annotations = [];
     while (true) {
@@ -244,14 +247,14 @@ Parser.prototype.annotations = function(allowed) {
 /**
  * @returns {ClassDesc}
  */
-Parser.prototype.classDesc = function() {
+classDesc() {
     return this.content(["ClassDesc", "ProxyClassDesc", "Null", "Reference"]);
 }
 
 /**
  * @returns {ClassDesc}
  */
-Parser.prototype.parseClassDesc = function() {
+parseClassDesc() {
     /** @type {ClassDesc} */
     var res = {};
     res.name = /** @type {names} */ (this.utf());
@@ -271,7 +274,7 @@ Parser.prototype.parseClassDesc = function() {
 /**
  * @returns {FieldDesc}
  */
-Parser.prototype.fieldDesc = function() {
+fieldDesc() {
     /** @type {FieldDesc} */
     var res = {};
     res.type = String.fromCharCode(this.readUInt8());
@@ -284,14 +287,14 @@ Parser.prototype.fieldDesc = function() {
 /**
  * @returns {ClassDesc}
  */
-Parser.prototype.parseClass = function() {
+parseClass() {
     return this.newHandle(this.classDesc());
 }
 
 /**
  * @returns {ObjectDesc}
  */
-Parser.prototype.parseObject = function() {
+parseObject() {
     /** @type {ObjectDesc} */
     var res = Object.defineProperties(/** @type {ObjectDesc} */ ({}), {
         "class": {
@@ -313,7 +316,7 @@ Parser.prototype.parseObject = function() {
  * @param {ObjectDesc} obj
  * @returns {void}
  */
-Parser.prototype.recursiveClassData = function(cls, obj) {
+recursiveClassData(cls, obj) {
     if (cls.super)
         this.recursiveClassData(cls.super, obj);
     var fields = obj.extends[cls.name] = this.classdata(cls, obj);
@@ -325,7 +328,7 @@ Parser.prototype.recursiveClassData = function(cls, obj) {
  * @param {ClassDesc} cls
  * @returns {Record<string, Handle>}
  */
-Parser.prototype.classdata = function(cls) {
+classdata(cls) {
     var /** @type {Record<string, Handle>} */ res, /** @type {[Buffer, ...Buffer[]]} */ data;
     /** @type {ParseFunc} */
     var postproc = this[`${cls.name}@${cls.serialVersionUID}`];
@@ -350,7 +353,7 @@ Parser.prototype.classdata = function(cls) {
 /**
  * @returns {ArrayDesc}
  */
-Parser.prototype.parseArray = function() {
+parseArray() {
     var classDesc = this.classDesc();
     /** @type {ArrayDesc} */
     var res = Object.defineProperties(/** @type {ArrayDesc} */ ([]), {
@@ -375,7 +378,7 @@ Parser.prototype.parseArray = function() {
 /**
  * @returns {Handle}
  */
-Parser.prototype.parseEnum = function() {
+parseEnum() {
     var clazz = this.classDesc();
     var deferredHandle = this.newDeferredHandle();
     var constant = this.content();
@@ -397,7 +400,7 @@ Parser.prototype.parseEnum = function() {
 /**
  * @returns {Buffer}
  */
-Parser.prototype.parseBlockData = function() {
+parseBlockData() {
     var len = this.readUInt8();
     var res = this.buf.slice(this.pos, this.pos + len);
     this.pos += len;
@@ -407,7 +410,7 @@ Parser.prototype.parseBlockData = function() {
 /**
  * @returns {Buffer}
  */
-Parser.prototype.parseBlockDataLong = function() {
+parseBlockDataLong() {
     var len = this.readUInt32();
     var res = this.buf.slice(this.pos, this.pos + len);
     this.pos += len;
@@ -417,14 +420,14 @@ Parser.prototype.parseBlockDataLong = function() {
 /**
  * @returns {string}
  */
-Parser.prototype.parseString = function() {
+parseString() {
     return this.newHandle(this.utf());
 }
 
 /**
  * @returns {string}
  */
-Parser.prototype.parseLongString = function() {
+parseLongString() {
     return this.newHandle(this.utfLong());
 }
 
@@ -433,7 +436,7 @@ Parser.prototype.parseLongString = function() {
  * @param {string} type
  * @returns {() => T}
  */
-Parser.prototype.primHandler = function(type) {
+primHandler(type) {
     /** @type {() => T} */
     var handler = this["prim" + type];
     if (!handler)
@@ -445,7 +448,7 @@ Parser.prototype.primHandler = function(type) {
  * @param {ClassDesc} cls
  * @returns {Record<string, Handle>}
  */
-Parser.prototype.values = function(cls) {
+values(cls) {
     /** @type {Record<string, Handle>} */
     var vals = {};
     var fields = cls.fields;
@@ -462,7 +465,7 @@ Parser.prototype.values = function(cls) {
  * @param {T} obj
  * @returns {T}
  */
-Parser.prototype.newHandle = function(obj) {
+newHandle(obj) {
     this.handles[this.nextHandle++] = obj;
     return obj;
 }
@@ -471,7 +474,7 @@ Parser.prototype.newHandle = function(obj) {
  * @template {Handle} T
  * @returns {(obj: T) => void}
  */
-Parser.prototype.newDeferredHandle = function() {
+newDeferredHandle() {
     var idx = this.nextHandle++;
     var handles = this.handles;
     handles[idx] = null;
@@ -486,63 +489,63 @@ Parser.prototype.newDeferredHandle = function() {
 /**
  * @returns {Handle | null | undefined}
  */
-Parser.prototype.parseReference = function() {
+parseReference() {
     return this.handles[this.readInt32()];
 }
 
 /**
  * @returns {null}
  */
-Parser.prototype.parseNull = function() {
+parseNull() {
     return null;
 }
 
 /**
  * @returns {{}}
  */
-Parser.prototype.parseEndBlockData = function() {
+parseEndBlockData() {
     return endBlock;
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.primB = function() {
+primB() {
     return this.readInt8();
 }
 
 /**
  * @returns {string}
  */
-Parser.prototype.primC = function() {
+primC() {
     return String.fromCharCode(this.readUInt16());
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.primD = function() {
+primD() {
     return this.buf.readDoubleBE(this.step(8));
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.primF = function() {
+primF() {
     return this.buf.readFloatBE(this.step(4));
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.primI = function() {
+primI() {
     return this.readInt32();
 }
 
 /**
  * @returns {Long}
  */
-Parser.prototype.primJ = function() {
+primJ() {
     var high = this.readUInt32();
     var low = this.readUInt32();
     return Long.fromBits(low, high);
@@ -551,28 +554,28 @@ Parser.prototype.primJ = function() {
 /**
  * @returns {number}
  */
-Parser.prototype.primS = function() {
+primS() {
     return this.readInt16();
 }
 
 /**
  * @returns {boolean}
  */
-Parser.prototype.primZ = function() {
+primZ() {
     return !!this.readInt8();
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype.primL = function() {
+primL() {
     return this.content();
 }
 
 /**
  * @returns {number}
  */
-Parser.prototype["prim["] = function() {
+["prim["]() {
     return this.content();
 }
 
@@ -582,10 +585,11 @@ Parser.prototype["prim["] = function() {
  * @param {ParseFunc} parser
  * @returns {void}
  */
-Parser.register = function(className, serialVersionUID, parser) {
+static register(className, serialVersionUID, parser) {
     assert.strictEqual(serialVersionUID.length, 16,
                        "serialVersionUID must be 16 hex digits");
     Parser.prototype[className + "@" + serialVersionUID] = parser;
+}
 }
 
 module.exports = Parser;
