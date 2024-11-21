@@ -24,65 +24,46 @@
 
 "use strict";
 
-var assert = require("assert");
-var Long = require("long");
+import assert = require("assert");
+import Long = require("long");
 
-/**
- * @typedef {string | ClassDesc | ObjectDesc} Handle
- */
+export type Handle = string | ClassDesc | ObjectDesc;
 
-/**
- * @typedef {{ name: names; serialVersionUID: string; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; }} ClassDesc
- */
+export type ClassDesc = { name: names; serialVersionUID: string; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; };
 
-/**
- * @typedef {{ class: ClassDesc; extends: Record<names, ClassDesc>; }} ObjectDesc
- */
+export type ObjectDesc = { class: ClassDesc; extends: Record<names, ClassDesc>; };
 
-/**
- * @typedef {Handle[] & { class: ClassDesc; extends: Record<names, ClassDesc>; }} ArrayDesc
- */
+export type ArrayDesc = Handle[] & { class: ClassDesc; extends: Record<names, ClassDesc>; };
 
-/**
- * @typedef {{ type: string; name: string; className: string; }} FieldDesc
- */
+export type FieldDesc = { type: string; name: string; className: string; };
 
-/**
- * @typedef {(cls: ClassDesc, res: Record<string, Handle>, data: [Buffer, ...Buffer[]]) => Record<string, Handle>} ParseFunc
- */
+export type ParseFunc = (cls: ClassDesc, res: Record<string, Handle>, data: [Buffer, ...Buffer[]]) => Record<string, Handle>;
 
-/**
- * @typedef {typeof names[number]} names
- */
+export type names = (typeof names)[number];
 
-var names = /** @type {const} */ ([
+var names = [
     "Null", "Reference", "ClassDesc", "Object", "String", "Array", "Class", "BlockData", "EndBlockData",
     "Reset", "BlockDataLong", "Exception", "LongString", "ProxyClassDesc", "Enum"
-]);
+] as const;
 
 var endBlock = {};
 
-/**
- * @typedef {{ [K in `${names}@${string}`]: ParseFunc; }} ParserMethods
- */
+export type ParserMethods = {
+    [K in `${names}@${string}`]: ParseFunc;
+};
 
-/**
- * @implements {ParserMethods}
- */
-class Parser {
-/**
- * @param {Buffer} buf
- */
-constructor(buf) {
-    /** @type {Buffer} */
+class Parser implements ParserMethods {
+buf: Buffer;
+pos: number;
+nextHandle: number;
+handles: (Handle | null)[];
+contents: Handle[];
+
+constructor(buf: Buffer) {
     this.buf = buf;
     this.pos = 0;
     this.nextHandle = 0x7e0000;
-    /**
-     * @type {(Handle | null)[]}
-     */
     this.handles = [];
-    /** @type {Handle[]} */
     this.contents = [];
     // @ts-expect-error
     this.magic();
@@ -93,16 +74,11 @@ constructor(buf) {
     }
 }
 
-/**
- * @param {number} len
- * @returns {number}
- */
-step(len) {
+step(len: number): number {
     var pos = this.pos;
     this.pos += len;
     if (this.pos > this.buf.length) {
-        /** @type {any} */
-        var err = new Error("Premature end of input");
+        var err: any = new Error("Premature end of input");
         err.buf = this.buf;
         err.pos = this.pos;
         throw err;
@@ -110,133 +86,80 @@ step(len) {
     return pos;
 }
 
-/**
- * @param {number} len
- * @param {BufferEncoding} encoding
- * @returns {string}
- */
-chunk(len, encoding) {
+chunk(len: number, encoding: BufferEncoding): string {
     var pos = this.step(len);
     return this.buf.toString(encoding, pos, this.pos);
 }
 
-/**
- * @returns {number}
- */
-readUInt8() {
+readUInt8(): number {
     return this.buf.readUInt8(this.step(1));
 }
 
-/**
- * @returns {number}
- */
-readInt8() {
+readInt8(): number {
     return this.buf.readInt8(this.step(1));
 }
 
-/**
- * @returns {number}
- */
-readUInt16() {
+readUInt16(): number {
     return this.buf.readUInt16BE(this.step(2));
 }
 
-/**
- * @returns {number}
- */
-readInt16() {
+readInt16(): number {
     return this.buf.readInt16BE(this.step(2));
 }
 
-/**
- * @returns {number}
- */
-readUInt32() {
+readUInt32(): number {
     return this.buf.readUInt32BE(this.step(4));
 }
 
-/**
- * @returns {number}
- */
-readInt32() {
+readInt32(): number {
     return this.buf.readInt32BE(this.step(4));
 }
 
-/**
- * @param {number} len
- * @returns {string}
- */
-readHex(len) {
+readHex(len: number): string {
     return this.chunk(len, "hex");
 }
 
-/**
- * @returns {string}
- */
-utf() {
+utf(): string {
     return this.chunk(this.readUInt16(), "utf8");
 }
 
-/**
- * @returns {string}
- */
-utfLong() {
+utfLong(): string {
     if (this.readUInt32() !== 0)
         throw new Error("Can't handle more than 2^32 bytes in a string");
     return this.chunk(this.readUInt32(), "utf8");
 }
 
-/**
- * @type {number | (() => void)}
- */
-magic = () => {
+magic: number | (() => void) = () => {
     this.magic = this.readUInt16();
     if (this.magic !== 0xaced)
         throw Error("STREAM_MAGIC not found");
 }
 
-/**
- * @type {number | (() => void)}
- */
-version = () => {
+version: number | (() => void) = () => {
     this.version = this.readUInt16();
     if (this.version !== 5)
         throw Error("Only understand protocol version 5");
 }
 
-/**
- * @template {Handle} T
- * @param {string[]} [allowed]
- * @returns {T}
- */
-content(allowed) {
+content<T extends Handle>(allowed?: string[]): T {
     var tc = this.readUInt8() - 0x70;
     if (tc < 0 || tc > names.length)
         throw Error("Don't know about type 0x" + (tc + 0x70).toString(16));
-    /** @type {string} */
-    var name = /** @type {string} */ (names[tc]);
+    var name: string = names[tc]!;
     if (allowed && allowed.indexOf(name) === -1)
         throw Error(name + " not allowed here");
     //// @ts-expect-error
-    /** @type {() => T} */
-    var handler = this["parse" + name];
+    var handler: () => T = this["parse" + name];
     if (!handler)
         throw Error("Don't know how to handle " + name);
-    ///** @type {unknown} */
-    var elt = handler.call(this);
+    var elt: T = handler.call(this);
     return elt;
 }
 
-/**
- * @param {string[]} [allowed]
- * @returns {string[]}
- */
-annotations(allowed) {
-    /** @type {string[]} */
-    var annotations = [];
+annotations(allowed?: string[]): string[] {
+    var annotations: string[] = [];
     while (true) {
-        /** @type {string} */
-        var annotation = this.content(allowed);
+        var annotation: string = this.content(allowed);
         if (annotation === endBlock)
             break;
         annotations.push(annotation);
@@ -244,20 +167,13 @@ annotations(allowed) {
     return annotations;
 }
 
-/**
- * @returns {ClassDesc}
- */
-classDesc() {
+classDesc(): ClassDesc {
     return this.content(["ClassDesc", "ProxyClassDesc", "Null", "Reference"]);
 }
 
-/**
- * @returns {ClassDesc}
- */
-parseClassDesc() {
-    /** @type {ClassDesc} */
-    var res = {};
-    res.name = /** @type {names} */ (this.utf());
+parseClassDesc(): ClassDesc {
+    var res = {} as ClassDesc;
+    res.name = this.utf() as names;
     res.serialVersionUID = this.readHex(8);
     this.newHandle(res);
     res.flags = this.readUInt8();
@@ -271,12 +187,8 @@ parseClassDesc() {
     return res;
 }
 
-/**
- * @returns {FieldDesc}
- */
-fieldDesc() {
-    /** @type {FieldDesc} */
-    var res = {};
+fieldDesc(): FieldDesc {
+    var res = {} as FieldDesc;
     res.type = String.fromCharCode(this.readUInt8());
     res.name = this.utf();
     if ("[L".indexOf(res.type) !== -1)
@@ -284,19 +196,12 @@ fieldDesc() {
     return res;
 }
 
-/**
- * @returns {ClassDesc}
- */
-parseClass() {
+parseClass(): ClassDesc {
     return this.newHandle(this.classDesc());
 }
 
-/**
- * @returns {ObjectDesc}
- */
-parseObject() {
-    /** @type {ObjectDesc} */
-    var res = Object.defineProperties(/** @type {ObjectDesc} */ ({}), {
+parseObject(): ObjectDesc {
+    var res: ObjectDesc = Object.defineProperties({} as ObjectDesc, {
         "class": {
             configurable: true,
             value: this.classDesc()
@@ -311,12 +216,7 @@ parseObject() {
     return res;
 }
 
-/**
- * @param {ClassDesc} cls
- * @param {ObjectDesc} obj
- * @returns {void}
- */
-recursiveClassData(cls, obj) {
+recursiveClassData(cls: ClassDesc, obj: ObjectDesc): void {
     if (cls.super)
         this.recursiveClassData(cls.super, obj);
     var fields = obj.extends[cls.name] = this.classdata(cls, obj);
@@ -324,14 +224,9 @@ recursiveClassData(cls, obj) {
         obj[name] = fields[name];
 }
 
-/**
- * @param {ClassDesc} cls
- * @returns {Record<string, Handle>}
- */
-classdata(cls) {
-    var /** @type {Record<string, Handle>} */ res, /** @type {[Buffer, ...Buffer[]]} */ data;
-    /** @type {ParseFunc} */
-    var postproc = this[`${cls.name}@${cls.serialVersionUID}`];
+classdata(cls: ClassDesc): Record<string, Handle> {
+    var res: Record<string, Handle>, data: [Buffer, ...Buffer[]];
+    var postproc: ParseFunc = this[`${cls.name}@${cls.serialVersionUID}`];
     switch (cls.flags & 0x0f) {
     case 0x02: // SC_SERIALIZABLE without SC_WRITE_METHOD
         return this.values(cls);
@@ -350,13 +245,9 @@ classdata(cls) {
     }
 }
 
-/**
- * @returns {ArrayDesc}
- */
-parseArray() {
+parseArray(): ArrayDesc {
     var classDesc = this.classDesc();
-    /** @type {ArrayDesc} */
-    var res = Object.defineProperties(/** @type {ArrayDesc} */ ([]), {
+    var res: ArrayDesc = Object.defineProperties([] as ArrayDesc, {
         "class": {
             configurable: true,
             value: classDesc
@@ -375,15 +266,11 @@ parseArray() {
     return res;
 }
 
-/**
- * @returns {Handle}
- */
-parseEnum() {
+parseEnum(): Handle {
     var clazz = this.classDesc();
     var deferredHandle = this.newDeferredHandle();
     var constant = this.content();
-    /** @type {Handle} */
-    var res = Object.defineProperties(/** @type {Handle} */ (new String(constant)), {
+    var res: Handle = Object.defineProperties(new String(constant) as Handle, {
         "class": {
             configurable: true,
             value: clazz
@@ -397,60 +284,37 @@ parseEnum() {
     return res;
 }
 
-/**
- * @returns {Buffer}
- */
-parseBlockData() {
+parseBlockData(): Buffer {
     var len = this.readUInt8();
     var res = this.buf.slice(this.pos, this.pos + len);
     this.pos += len;
     return res;
 }
 
-/**
- * @returns {Buffer}
- */
-parseBlockDataLong() {
+parseBlockDataLong(): Buffer {
     var len = this.readUInt32();
     var res = this.buf.slice(this.pos, this.pos + len);
     this.pos += len;
     return res;
 }
 
-/**
- * @returns {string}
- */
-parseString() {
+parseString(): string {
     return this.newHandle(this.utf());
 }
 
-/**
- * @returns {string}
- */
-parseLongString() {
+parseLongString(): string {
     return this.newHandle(this.utfLong());
 }
 
-/**
- * @template {Handle} T
- * @param {string} type
- * @returns {() => T}
- */
-primHandler(type) {
-    /** @type {() => T} */
-    var handler = this["prim" + type];
+primHandler<T extends Handle>(type: string): () => T {
+    var handler: () => T = this["prim" + type];
     if (!handler)
         throw Error("Don't know how to read field of type '" + type + "'");
     return handler;
 }
 
-/**
- * @param {ClassDesc} cls
- * @returns {Record<string, Handle>}
- */
-values(cls) {
-    /** @type {Record<string, Handle>} */
-    var vals = {};
+values(cls: ClassDesc): Record<string, Handle> {
+    var vals: Record<string, Handle> = {};
     var fields = cls.fields;
     for (var i = 0; i < fields.length; ++i) {
         var field = fields[i];
@@ -460,136 +324,79 @@ values(cls) {
     return vals;
 }
 
-/**
- * @template {Handle} T
- * @param {T} obj
- * @returns {T}
- */
-newHandle(obj) {
+newHandle<T extends Handle>(obj: T): T {
     this.handles[this.nextHandle++] = obj;
     return obj;
 }
 
-/**
- * @template {Handle} T
- * @returns {(obj: T) => void}
- */
-newDeferredHandle() {
+newDeferredHandle<T extends Handle>(): (obj: T) => void {
     var idx = this.nextHandle++;
     var handles = this.handles;
     handles[idx] = null;
-    /**
-     * @param {T} obj
-     */
-    return function(obj) {
+    return function(obj: T) {
         handles[idx] = obj;
     };
 }
 
-/**
- * @returns {Handle | null | undefined}
- */
-parseReference() {
+parseReference(): Handle | null | undefined {
     return this.handles[this.readInt32()];
 }
 
-/**
- * @returns {null}
- */
-parseNull() {
+parseNull(): null {
     return null;
 }
 
-/**
- * @returns {{}}
- */
-parseEndBlockData() {
+parseEndBlockData(): {} {
     return endBlock;
 }
 
-/**
- * @returns {number}
- */
-primB() {
+primB(): number {
     return this.readInt8();
 }
 
-/**
- * @returns {string}
- */
-primC() {
+primC(): string {
     return String.fromCharCode(this.readUInt16());
 }
 
-/**
- * @returns {number}
- */
-primD() {
+primD(): number {
     return this.buf.readDoubleBE(this.step(8));
 }
 
-/**
- * @returns {number}
- */
-primF() {
+primF(): number {
     return this.buf.readFloatBE(this.step(4));
 }
 
-/**
- * @returns {number}
- */
-primI() {
+primI(): number {
     return this.readInt32();
 }
 
-/**
- * @returns {Long}
- */
-primJ() {
+primJ(): Long {
     var high = this.readUInt32();
     var low = this.readUInt32();
     return Long.fromBits(low, high);
 }
 
-/**
- * @returns {number}
- */
-primS() {
+primS(): number {
     return this.readInt16();
 }
 
-/**
- * @returns {boolean}
- */
-primZ() {
+primZ(): boolean {
     return !!this.readInt8();
 }
 
-/**
- * @returns {number}
- */
-primL() {
+primL(): number {
     return this.content();
 }
 
-/**
- * @returns {number}
- */
-["prim["]() {
+["prim["](): number {
     return this.content();
 }
 
-/**
- * @param {names} className
- * @param {string} serialVersionUID
- * @param {ParseFunc} parser
- * @returns {void}
- */
-static register(className, serialVersionUID, parser) {
+static register(className: names, serialVersionUID: string, parser: ParseFunc): void {
     assert.strictEqual(serialVersionUID.length, 16,
                        "serialVersionUID must be 16 hex digits");
     Parser.prototype[className + "@" + serialVersionUID] = parser;
 }
 }
 
-module.exports = Parser;
+export default Parser;

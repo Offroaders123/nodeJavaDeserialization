@@ -22,14 +22,10 @@
 
 "use strict";
 
-var Parser = require("./parser.js");
-require("./util.js");
+import Parser from "./parser.js";
+import "./util.js";
 
-/**
- * @param {Buffer} buf
- * @returns {import("./parser.js").Handle[]}
- */
-module.exports.parse = function parse(buf) {
+export function parse(buf: Buffer): import("./parser.js").Handle[] {
     var parser = new Parser(buf);
     return parser.contents;
 }
