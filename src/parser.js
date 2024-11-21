@@ -63,7 +63,12 @@ var names = /** @type {const} */ ([
 var endBlock = {};
 
 /**
+ * @typedef {{ [K in `${names}@${string}`]: ParseFunc; }} ParserMethods
+ */
+
+/**
  * @param {Buffer} buf
+ * @implements {ParserMethods}
  */
 function Parser(buf) {
     /** @type {Buffer} */
@@ -323,7 +328,7 @@ Parser.prototype.recursiveClassData = function(cls, obj) {
 Parser.prototype.classdata = function(cls) {
     var /** @type {Record<string, Handle>} */ res, /** @type {[Buffer, ...Buffer[]]} */ data;
     /** @type {ParseFunc} */
-    var postproc = this[cls.name + "@" + cls.serialVersionUID];
+    var postproc = this[`${cls.name}@${cls.serialVersionUID}`];
     switch (cls.flags & 0x0f) {
     case 0x02: // SC_SERIALIZABLE without SC_WRITE_METHOD
         return this.values(cls);
@@ -572,7 +577,7 @@ Parser.prototype["prim["] = function() {
 }
 
 /**
- * @param {string} className
+ * @param {names} className
  * @param {string} serialVersionUID
  * @param {ParseFunc} parser
  * @returns {void}
