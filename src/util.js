@@ -24,12 +24,22 @@
 
 var Parser = require("./parser.js");
 
+/**
+ * @typedef {import("./parser.js").ParseFunc} ParseFunc
+ */
+
+/**
+ * @type {ParseFunc}
+ */
 function listParser(cls, fields, data) {
     // var size_or_capacity = data[0].readInt32BE(0);
     fields.list = data.slice(1);
     return fields;
 }
 
+/**
+ * @type {ParseFunc}
+ */
 function mapParser(cls, fields, data) {
     var capacity = data[0].readInt32BE(0);
     var size = data[0].readInt32BE(4);
@@ -48,6 +58,9 @@ function mapParser(cls, fields, data) {
     return fields;
 }
 
+/**
+ * @type {ParseFunc}
+ */
 function enumMapParser(cls, fields, data) {
     var size = data[0].readInt32BE(0);
     var map = new Map();
@@ -63,6 +76,9 @@ function enumMapParser(cls, fields, data) {
     return fields;
 }
 
+/**
+ * @type {ParseFunc}
+ */
 function hashSetParser(cls, fields, data) {
     var capacity = data[0].readInt32BE(0);
     var loadFactor = data[0].readFloatBE(4);

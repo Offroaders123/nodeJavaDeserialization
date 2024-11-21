@@ -36,15 +36,19 @@ var Long = require("long");
  */
 
 /**
- * @typedef {{ class: string; extends: object; }} ObjectDesc
+ * @typedef {{ class: ClassDesc; extends: Record<string, ClassDesc>; }} ObjectDesc
  */
 
 /**
- * @typedef {[] & { class: string; extends: object; }} ArrayDesc
+ * @typedef {Handle[] & { class: ClassDesc; extends: Record<string, ClassDesc>; }} ArrayDesc
  */
 
 /**
  * @typedef {{ type: string; name: string; className: string; }} FieldDesc
+ */
+
+/**
+ * @typedef {(cls: ClassDesc, res: Record<string, Handle>, data: [Buffer, ...Buffer[]]) => Record<string, Handle>} ParseFunc
  */
 
 var names = [
@@ -189,8 +193,9 @@ Parser.prototype.version = function() {
 }
 
 /**
+ * @template {Handle} T
  * @param {string[]} [allowed]
- * @returns {unknown}
+ * @returns {T}
  */
 Parser.prototype.content = function(allowed) {
     var tc = this.readUInt8() - 0x70;
@@ -200,11 +205,12 @@ Parser.prototype.content = function(allowed) {
     var name = /** @type {string} */ (names[tc]);
     if (allowed && allowed.indexOf(name) === -1)
         throw Error(name + " not allowed here");
-    // @ts-expect-error
+    //// @ts-expect-error
+    /** @type {() => T} */
     var handler = this["parse" + name];
     if (!handler)
         throw Error("Don't know how to handle " + name);
-    /** @type {unknown} */
+    ///** @type {unknown} */
     var elt = handler.call(this);
     return elt;
 }
@@ -278,7 +284,7 @@ Parser.prototype.parseClass = function() {
  */
 Parser.prototype.parseObject = function() {
     /** @type {ObjectDesc} */
-    var res = Object.defineProperties({}, {
+    var res = Object.defineProperties(/** @type {ObjectDesc} */ ({}), {
         "class": {
             configurable: true,
             value: this.classDesc()
@@ -294,8 +300,8 @@ Parser.prototype.parseObject = function() {
 }
 
 /**
- * @param cls
- * @param obj
+ * @param {ClassDesc} cls
+ * @param {ObjectDesc} obj
  * @returns {void}
  */
 Parser.prototype.recursiveClassData = function(cls, obj) {
@@ -307,10 +313,12 @@ Parser.prototype.recursiveClassData = function(cls, obj) {
 }
 
 /**
- * @param cls
+ * @param {ClassDesc} cls
+ * @returns {Record<string, Handle>}
  */
 Parser.prototype.classdata = function(cls) {
-    var res, data;
+    var /** @type {Record<string, Handle>} */ res, /** @type {[Buffer, ...Buffer[]]} */ data;
+    /** @type {ParseFunc} */
     var postproc = this[cls.name + "@" + cls.serialVersionUID];
     switch (cls.flags & 0x0f) {
     case 0x02: // SC_SERIALIZABLE without SC_WRITE_METHOD
@@ -355,11 +363,15 @@ Parser.prototype.parseArray = function() {
     return res;
 }
 
+/**
+ * @returns {Handle}
+ */
 Parser.prototype.parseEnum = function() {
     var clazz = this.classDesc();
     var deferredHandle = this.newDeferredHandle();
     var constant = this.content();
-    var res = Object.defineProperties(new String(constant), {
+    /** @type {Handle} */
+    var res = Object.defineProperties(/** @type {Handle} */ (new String(constant)), {
         "class": {
             configurable: true,
             value: clazz
@@ -408,9 +420,12 @@ Parser.prototype.parseLongString = function() {
 }
 
 /**
- * @param type
+ * @template {Handle} T
+ * @param {string} type
+ * @returns {() => T}
  */
 Parser.prototype.primHandler = function(type) {
+    /** @type {() => T} */
     var handler = this["prim" + type];
     if (!handler)
         throw Error("Don't know how to read field of type '" + type + "'");
@@ -418,9 +433,11 @@ Parser.prototype.primHandler = function(type) {
 }
 
 /**
- * @param cls
+ * @param {ClassDesc} cls
+ * @returns {Record<string, Handle>}
  */
 Parser.prototype.values = function(cls) {
+    /** @type {Record<string, Handle>} */
     var vals = {};
     var fields = cls.fields;
     for (var i = 0; i < fields.length; ++i) {
@@ -553,7 +570,8 @@ Parser.prototype["prim["] = function() {
 /**
  * @param {string} className
  * @param {string} serialVersionUID
- * @param parser
+ * @param {ParseFunc} parser
+ * @returns {void}
  */
 Parser.register = function(className, serialVersionUID, parser) {
     assert.strictEqual(serialVersionUID.length, 16,
