@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
     "module": "CommonJS",
     "target": "ESNext",
     "isolatedModules": true,
@@ -14,6 +16,7 @@
     // "noUnusedParameters": true
   },
   "exclude": [
-    "./coverage"
+    "./coverage",
+    "./dist"
   ]
 }
