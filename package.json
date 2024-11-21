@@ -2,9 +2,11 @@
   "name": "java-deserialization",
   "version": "0.1.0",
   "description": "Parse Java object serialization format using pure JavaScript",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "test": "nyc --reporter=html --reporter=text-summary mocha test/*.js",
+    "build": "tsc --project ./tsconfig.build.json",
+    "dev": "tsc --watch",
+    "test": "npm run build; nyc --reporter=html --reporter=text-summary mocha test/*.js",
     "gentest": "cd test && javac *.java && java GenerateTestCases > generated.js && npm test"
   },
   "repository": {

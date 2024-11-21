@@ -1,4 +1,5 @@
 /node_modules/
+/dist/
 /test/*.class
 /package-lock.json
 /.nyc_output/
