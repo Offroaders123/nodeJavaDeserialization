@@ -30,11 +30,22 @@ import { enumMapParser, hashSetParser, listParser, mapParser } from "./util.js";
 
 export type Handle = string | number | Long | boolean | ClassDesc | ObjectDesc | null | Buffer;
 
-export type ClassDesc = { name: ClassNames; serialVersionUID: string; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; };
+export type ClassDesc<T extends ContentNames = ContentNames> = { name: ClassNames<T>; serialVersionUID: SerialVersionUID; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; };
 
-export type ClassNames = `java.util.${ContentNames}`;
+export type ClassNames<T extends ContentNames = ContentNames> = `java.util.${T}`;
 
 export type ContentNames = Exclude<names, "Reset" | "Exception" | "ProxyClassDesc" | "EndBlockData">;
+
+export type SerialVersionUID<K extends keyof SerialVersionUIDMap = keyof SerialVersionUIDMap> = SerialVersionUIDMap[K];
+
+export interface SerialVersionUIDMap {
+  ArrayList: "7881d21d99c7619d";
+  ArrayDeque: "207cda2e240da08b";
+  Hashtable: "13bb0f25214ae4b8";
+  HashMap: "0507dac1c31660d1";
+  EnumMap: "065d7df7be907ca1";
+  HashSet: "ba44859596b8b734";
+}
 
 export type ObjectDesc = { class: ClassDesc; extends: Record<names, ClassDesc>; };
 
@@ -181,7 +192,7 @@ classDesc(): ClassDesc {
 parseClassDesc(): ClassDesc {
     var res = {} as ClassDesc;
     res.name = this.utf() as ClassNames;
-    res.serialVersionUID = this.readHex(8);
+    res.serialVersionUID = this.readHex(8) as SerialVersionUID;
     this.newHandle(res);
     res.flags = this.readUInt8();
     res.isEnum = !!(res.flags & 0x10);
@@ -254,7 +265,7 @@ classdata(cls: ClassDesc): Record<string, Handle> {
 
 parseArray(): ArrayDesc {
     var classDesc = this.classDesc();
-    var res: ArrayDesc = Object.defineProperties([] as ArrayDesc, {
+    var res: ArrayDesc = Object.defineProperties([] as unknown as ArrayDesc, {
         "class": {
             configurable: true,
             value: classDesc
@@ -266,7 +277,7 @@ parseArray(): ArrayDesc {
     });
     this.newHandle(res);
     var len = this.readInt32();
-    var handler = this.primHandler(classDesc.name.charAt(1));
+    var handler = this.primHandler(classDesc.name.charAt(1) as PrimType);
     res.length = len;
     for (var i = 0; i < len; ++i)
         res[i] = handler.call(this);
