@@ -22,17 +22,17 @@
 
 "use strict";
 
-import Parser from "./parser.js";
+// import Parser from "./parser.js";
 
 import type { ParseFunc } from "./parser.js";
 
-var listParser: ParseFunc = function(cls, fields, data) {
+export var listParser: ParseFunc = function(cls, fields, data) {
     // var size_or_capacity = data[0].readInt32BE(0);
     fields.list = data.slice(1);
     return fields;
 }
 
-var mapParser: ParseFunc = function(cls, fields, data) {
+export var mapParser: ParseFunc = function(cls, fields, data) {
     var capacity = data[0].readInt32BE(0);
     var size = data[0].readInt32BE(4);
     var map = new Map();
@@ -50,7 +50,7 @@ var mapParser: ParseFunc = function(cls, fields, data) {
     return fields;
 }
 
-var enumMapParser: ParseFunc = function(cls, fields, data) {
+export var enumMapParser: ParseFunc = function(cls, fields, data) {
     var size = data[0].readInt32BE(0);
     var map = new Map();
     var obj = {};
@@ -65,7 +65,7 @@ var enumMapParser: ParseFunc = function(cls, fields, data) {
     return fields;
 }
 
-var hashSetParser: ParseFunc = function(cls, fields, data) {
+export var hashSetParser: ParseFunc = function(cls, fields, data) {
     var capacity = data[0].readInt32BE(0);
     var loadFactor = data[0].readFloatBE(4);
     var size = data[0].readInt32BE(8);
@@ -76,9 +76,9 @@ var hashSetParser: ParseFunc = function(cls, fields, data) {
     return fields;
 }
 
-Parser.register("java.util.ArrayList", "7881d21d99c7619d",  listParser);
-Parser.register("java.util.ArrayDeque", "207cda2e240da08b", listParser);
-Parser.register("java.util.Hashtable", "13bb0f25214ae4b8",  mapParser);
-Parser.register("java.util.HashMap", "0507dac1c31660d1", mapParser);
-Parser.register("java.util.EnumMap", "065d7df7be907ca1", enumMapParser);
-Parser.register("java.util.HashSet", "ba44859596b8b734", hashSetParser);
+// Parser.register("java.util.ArrayList", "7881d21d99c7619d",  listParser);
+// Parser.register("java.util.ArrayDeque", "207cda2e240da08b", listParser);
+// Parser.register("java.util.Hashtable", "13bb0f25214ae4b8",  mapParser);
+// Parser.register("java.util.HashMap", "0507dac1c31660d1", mapParser);
+// Parser.register("java.util.EnumMap", "065d7df7be907ca1", enumMapParser);
+// Parser.register("java.util.HashSet", "ba44859596b8b734", hashSetParser);

@@ -23,7 +23,7 @@
 "use strict";
 
 import Parser from "./parser.js";
-import "./util.js";
+// import "./util.js";
 
 export function parse(buf: Buffer): import("./parser.js").Handle[] {
     var parser = new Parser(buf);

@@ -26,6 +26,7 @@
 
 import assert = require("assert");
 import Long = require("long");
+import { enumMapParser, hashSetParser, listParser, mapParser } from "./util.js";
 
 export type Handle = string | ClassDesc | ObjectDesc;
 
@@ -392,11 +393,19 @@ primL(): number {
     return this.content();
 }
 
-static register(className: string, serialVersionUID: string, parser: ParseFunc): void {
-    assert.strictEqual(serialVersionUID.length, 16,
-                       "serialVersionUID must be 16 hex digits");
-    Parser.prototype[className + "@" + serialVersionUID] = parser;
-}
+// static register(className: string, serialVersionUID: string, parser: ParseFunc): void {
+//     assert.strictEqual(serialVersionUID.length, 16,
+//                        "serialVersionUID must be 16 hex digits");
+//     Parser.prototype[className + "@" + serialVersionUID] = parser;
+// }
+
+["java.util.ArrayList@7881d21d99c7619d"] = listParser;
+["java.util.ArrayDeque@207cda2e240da08b"] = listParser;
+["java.util.Hashtable@13bb0f25214ae4b8"] = mapParser;
+["java.util.HashMap@0507dac1c31660d1"] = mapParser;
+["java.util.EnumMap@065d7df7be907ca1"] = enumMapParser;
+["java.util.HashSet@ba44859596b8b734"] = hashSetParser;
+
 }
 
 export default Parser;
