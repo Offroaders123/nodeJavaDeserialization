@@ -28,15 +28,21 @@ import assert = require("assert");
 import Long = require("long");
 import { enumMapParser, hashSetParser, listParser, mapParser } from "./util.js";
 
-export type Handle = string | ClassDesc | ObjectDesc;
+export type Handle = string | number | Long | boolean | ClassDesc | ObjectDesc | null | Buffer;
 
-export type ClassDesc = { name: names; serialVersionUID: string; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; };
+export type ClassDesc = { name: ClassNames; serialVersionUID: string; flags: number; isEnum: boolean; fields: FieldDesc[]; annotations: string[]; super: ClassDesc; };
+
+export type ClassNames = `java.util.${ContentNames}`;
+
+export type ContentNames = Exclude<names, "Reset" | "Exception" | "ProxyClassDesc" | "EndBlockData">;
 
 export type ObjectDesc = { class: ClassDesc; extends: Record<names, ClassDesc>; };
 
 export type ArrayDesc = Handle[] & { class: ClassDesc; extends: Record<names, ClassDesc>; };
 
-export type FieldDesc = { type: string; name: string; className: string; };
+export type FieldDesc = { type: PrimType; name: string; className: string; };
+
+export type PrimType = "B" | "C" | "D" | "F" | "I" | "J" | "S" | "Z" | "L" | "[";
 
 export type ParseFunc = (cls: ClassDesc, res: Record<string, Handle>, data: [Buffer, ...Buffer[]]) => Record<string, Handle>;
 
@@ -49,11 +55,11 @@ var names = [
 
 var endBlock = {};
 
-export type ParserMethods = {
-    [K in `${string}@${string}`]: ParseFunc;
-};
+// export type ParserMethods = {
+//     [K in `${string}@${string}`]: ParseFunc;
+// };
 
-class Parser implements ParserMethods {
+class Parser {
 buf: Buffer;
 pos: number;
 nextHandle: number;
@@ -142,22 +148,22 @@ version: number | (() => void) = () => {
         throw Error("Only understand protocol version 5");
 }
 
-content<T extends Handle>(allowed?: string[]): T {
-    var tc = this.readUInt8() - 0x70;
+content<T extends Handle>(allowed?: names[]): T {
+    var tc: number = this.readUInt8() - 0x70;
     if (tc < 0 || tc > names.length)
         throw Error("Don't know about type 0x" + (tc + 0x70).toString(16));
-    var name: string = names[tc]!;
+    var name: ContentNames = names[tc]! as ContentNames;
     if (allowed && allowed.indexOf(name) === -1)
         throw Error(name + " not allowed here");
     //// @ts-expect-error
-    var handler: () => T = this["parse" + name];
+    var handler: () => Handle = this[`parse${name}`];
     if (!handler)
         throw Error("Don't know how to handle " + name);
-    var elt: T = handler.call(this);
+    var elt: T = handler.call(this) as T;
     return elt;
 }
 
-annotations(allowed?: string[]): string[] {
+annotations(allowed?: names[]): string[] {
     var annotations: string[] = [];
     while (true) {
         var annotation: string = this.content(allowed);
@@ -174,7 +180,7 @@ classDesc(): ClassDesc {
 
 parseClassDesc(): ClassDesc {
     var res = {} as ClassDesc;
-    res.name = this.utf() as names;
+    res.name = this.utf() as ClassNames;
     res.serialVersionUID = this.readHex(8);
     this.newHandle(res);
     res.flags = this.readUInt8();
@@ -190,7 +196,7 @@ parseClassDesc(): ClassDesc {
 
 fieldDesc(): FieldDesc {
     var res = {} as FieldDesc;
-    res.type = String.fromCharCode(this.readUInt8());
+    res.type = String.fromCharCode(this.readUInt8()) as PrimType;
     res.name = this.utf();
     if ("[L".indexOf(res.type) !== -1)
         res.className = this.content();
@@ -307,18 +313,18 @@ parseLongString(): string {
     return this.newHandle(this.utfLong());
 }
 
-primHandler<T extends Handle>(type: string): () => T {
-    var handler: () => T = this["prim" + type];
+primHandler<T extends Handle>(type: PrimType): () => T {
+    var handler: () => Handle = this[`prim${type}`];
     if (!handler)
         throw Error("Don't know how to read field of type '" + type + "'");
-    return handler;
+    return handler as () => T;
 }
 
 values(cls: ClassDesc): Record<string, Handle> {
     var vals: Record<string, Handle> = {};
-    var fields = cls.fields;
+    var fields: FieldDesc[] = cls.fields;
     for (var i = 0; i < fields.length; ++i) {
-        var field = fields[i];
+        var field: FieldDesc = fields[i]!;
         var handler = this.primHandler(field.type);
         vals[field.name] = handler.call(this);
     }
@@ -339,8 +345,8 @@ newDeferredHandle<T extends Handle>(): (obj: T) => void {
     };
 }
 
-parseReference(): Handle | null | undefined {
-    return this.handles[this.readInt32()];
+parseReference(): Handle | null {
+    return this.handles[this.readInt32()]!;
 }
 
 parseNull(): null {
@@ -385,11 +391,11 @@ primZ(): boolean {
     return !!this.readInt8();
 }
 
-primL(): number {
+primL() {
     return this.content();
 }
 
-["prim["](): number {
+["prim["]() {
     return this.content();
 }
 
