@@ -49,7 +49,7 @@ var names = [
 var endBlock = {};
 
 export type ParserMethods = {
-    [K in `${names}@${string}`]: ParseFunc;
+    [K in `${string}@${string}`]: ParseFunc;
 };
 
 class Parser implements ParserMethods {
@@ -392,7 +392,7 @@ primL(): number {
     return this.content();
 }
 
-static register(className: names, serialVersionUID: string, parser: ParseFunc): void {
+static register(className: string, serialVersionUID: string, parser: ParseFunc): void {
     assert.strictEqual(serialVersionUID.length, 16,
                        "serialVersionUID must be 16 hex digits");
     Parser.prototype[className + "@" + serialVersionUID] = parser;
